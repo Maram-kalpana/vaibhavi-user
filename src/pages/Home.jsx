@@ -24,6 +24,7 @@ import {
 import {
   createPaymentOrderApi,
   verifyPaymentApi,
+   createCodOrderApi,
 } from "../api/orderApi";
 
 import {
@@ -84,6 +85,7 @@ export default function Home() {
     paymentLoading,
     setPaymentLoading,
   ] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("online"); // "online" | "cod"
 
   const [
     cartId,
@@ -516,6 +518,52 @@ if (!allowedLocations.includes(location)) {
 
         return;
       }
+      if (paymentMethod === "cod") {
+  try {
+    setPaymentLoading(true);
+
+    const codResponse = await createCodOrderApi({
+      customer_name: customerName,
+      mobile,
+      location,
+      cart_id: cartId,
+    });
+
+    const codData = codResponse?.data?.data;
+
+    if (!codResponse?.data?.success || !codData?.order_id) {
+      throw new Error("Unable to place COD order.");
+    }
+
+    setSuccessOrder({
+      orderId: codData.order_id,
+      paymentId: null,
+      paymentMethod: "Cash on Delivery",
+      isCod: true,
+      customerName: codData.customer_name || customerName,
+      mobile: codData.mobile || mobile,
+      location: codData.location || location,
+      totalAmount: Number(codData.total_amount || totalAmount),
+    });
+
+    setQuantities({});
+    setCustomer({ name: "", mobile: "", location: "" });
+    setCartId(null);
+    setPaymentMethod("online");
+    setShowCheckout(false);
+  } catch (error) {
+    console.error("COD order error:", error);
+    alert(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Unable to place order."
+    );
+  } finally {
+    setPaymentLoading(false);
+  }
+
+  return;
+}
 
 
       try {
@@ -1830,6 +1878,40 @@ if (successOrder) {
     </option>
   </select>
 </div>
+{/* PAYMENT METHOD */}
+<div>
+  <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+    Payment Method
+  </label>
+
+  <div className="grid grid-cols-2 gap-3">
+    {[
+      { value: "online", label: "Pay Online", sub: "UPI / Card / NetBanking" },
+      { value: "cod", label: "Cash on Delivery", sub: "Pay when you receive" },
+    ].map((option) => {
+      const active = paymentMethod === option.value;
+
+      return (
+        <button
+          key={option.value}
+          type="button"
+          disabled={paymentLoading}
+          onClick={() => setPaymentMethod(option.value)}
+          className={`rounded-xl border px-3 py-3 text-left transition disabled:opacity-60 ${
+            active
+              ? "border-[#bf0000] bg-[#bf0000]/5 ring-2 ring-[#bf0000]/10"
+              : "border-slate-300 bg-white hover:border-[#bf0000]/40"
+          }`}
+        >
+          <p className={`text-sm font-bold ${active ? "text-[#bf0000]" : "text-slate-800"}`}>
+            {option.label}
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-500">{option.sub}</p>
+        </button>
+      );
+    })}
+  </div>
+</div>
 
               {/* PAY NOW */}
 
@@ -1846,9 +1928,11 @@ if (successOrder) {
                   size={18}
                 />
 
-                {paymentLoading
-                  ? "Please wait..."
-                  : `Pay Now ₹${totalAmount}`}
+               {paymentLoading
+  ? "Please wait..."
+  : paymentMethod === "cod"
+    ? `Place Order ₹${totalAmount}`
+    : `Pay Now ₹${totalAmount}`}
 
               </button>
 

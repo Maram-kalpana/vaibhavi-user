@@ -22,3 +22,9 @@ export const verifyPaymentApi = (data) => {
     data
   );
 };
+export const createCodOrderApi = (data) => {
+  return axiosClient.post(
+    "/payments/cod-order",
+    data
+  );
+};
